@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.asm": "retroasm_6502",
+    "cmath": "cpp"
+  }
+}

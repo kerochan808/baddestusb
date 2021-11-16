@@ -1,0 +1,7 @@
+{
+    "configuration": "flash=2097152_0,freq=125,dbgport=Disabled,dbglvl=None,usbstack=picosdk",
+    "board": "rp2040:rp2040:rpipico",
+    "sketch": "baddestusb.ino",
+    "output": "../ArduinoOutput",
+    "port": "COM13"
+}
