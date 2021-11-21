@@ -8,13 +8,14 @@
 
 // includes
 #include <Keyboard.h>
+#include <SPI.h>
+#include <SD.h> // SD Card Library
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
-#include <SPI.h>
 
 // pin definitions
 // hardware pins:
-// MISO - GP17
+// MISO - GP16
 // SCK - GP18
 // MOSI - GP19
 #define TFT_CS 10
@@ -86,12 +87,151 @@ class ButtonHandler
         }
 };
 
+// the important globals
 ButtonHandler btns = ButtonHandler( BTN0_PIN, BTN1_PIN, BTN2_PIN );
 Adafruit_ST7735 tft = Adafruit_ST7735( TFT_CS, TFT_DC, TFT_RST );
 
 // colors for drawing
 uint16_t bgcolor = ST77XX_BLACK;
 uint16_t textcolor = ST77XX_GREEN;
+uint16_t textcolor2 = ST77XX_RED;
+
+// sd card status
+bool sdCardFail = false;
+
+const PROGMEM int MAIN_MENU_COUNT = 3;
+const PROGMEM int MICRO_SD_INDEX = 1;
+const PROGMEM String MAIN_MENU_OPTIONS[] =
+{
+    "PROGMEM",
+    "Micro SD",
+    "Help!!!"
+};
+
+// main top level menu
+void mainMenu()
+{
+    // Turn off led
+    digitalWrite( LED_PIN, LOW );
+    // prepare tft for printing menu text
+    tft.setTextColor( textcolor );
+    tft.setTextWrap( false );
+
+    int selected = 0;
+    bool exit = false;
+    bool enter = true;
+    do
+    {
+        // update menu
+        tft.fillScreen( bgcolor ); // clear screen
+        tft.setCursor( 0, 0 );
+        tft.print( "The Baddest USB v0.5" ); // display menu label
+        for( int i = 0; i < MAIN_MENU_COUNT; i ++ ) // display menu options
+        {
+            if( sdCardFail && i == MICRO_SD_INDEX )
+                tft.setTextColor( textcolor2 );
+            else if( i == MICRO_SD_INDEX + 1 )
+                tft.setTextColor( textcolor );
+            tft.setCursor( 8, ( i + 2 ) * 8 );
+            tft.print( MAIN_MENU_OPTIONS[ i ] );
+        }
+        tft.setCursor( 0, ( selected + 2 ) * 8 );
+        tft.print( ">" ); // print cursor
+
+        // wait till no input if entering into menu
+        if( enter )
+        {
+            while( btns.pressed( 0 ) || btns.pressed( 1 ) || btns.pressed( 2 ) ); // wait till no more input
+            enter = false;
+        }
+
+        bool up = false;
+        bool down = false;
+        // wait for input
+        while( !enter && !exit && !up && !down )
+        {
+            if( btns.pressed( 1 ) ) // execute current selection if center button pressed
+                exit = true;
+            while( btns.pressed( 0 ) ) // keep going in loop until press has stopped
+                up = true;
+            while( btns.pressed( 2 ) ) // keep going in loop until press has stopped
+                down = true;
+        }
+        // move selected number
+        if( up )
+            selected --;
+        else if( down )
+            selected ++;
+        // keep in bounds
+        if( selected < 0 )
+            selected = MAIN_MENU_COUNT - 1;
+        else if( selected >= MAIN_MENU_COUNT )
+            selected = 0;
+    } 
+    while( !exit ); // while not exit from menu
+
+    // call function for selected option
+    switch( selected )
+    {
+        case 0:
+            payloadMenuPROGMEM();
+        break;
+        case 1:
+            payloadMenuMicroSD();
+        break;
+        case 2:
+            helpScreen();
+        break;
+        default:
+
+        break;
+    }
+}
+
+// help screen
+const PROGMEM String HELP_TEXT = 
+"if you need help     "
+"using this then i    "
+"suggest you put this "
+"down and walk away..."
+"\n\n"
+"or you can read the  "
+"docs at:\n"
+"https://github.com/\n"
+"kerochan808/\n"
+"baddestusb\n"
+"\n"
+"enjoy! :3\n"
+"\n"
+"oh and btw, im not\n"
+"responsible for any\n"
+"damage/harm or\n"
+"really anything you\n"
+"do with this thing.";
+void helpScreen()
+{
+    // prepare tft for printing help screen text
+    tft.setTextColor( textcolor );
+    tft.setTextWrap( true );
+
+    // display menu
+    tft.fillScreen( bgcolor ); // clear screen
+    tft.setCursor( 0, 0 );
+    tft.print( "Help!!!" ); // display menu label
+    tft.setCursor( 0, 16 );
+    tft.print( HELP_TEXT );
+
+    // wait for input to exit
+    bool exit = false;
+    bool enter = true;
+    while( !exit )
+    {
+        if( enter && !btns.pressed( 0 ) && !btns.pressed( 1 ) && !btns.pressed( 2 ) ) // wait till no input if entering into menu
+            enter = false;
+        if( !enter && ( btns.pressed( 0 ) || btns.pressed( 1 ) || btns.pressed( 2 ) ) ) // execute current selection if center button pressed
+            exit = true;
+    }
+}
 
 // PROGMEM payloads variables
 const PROGMEM int PROGMEM_PAYLOAD_COUNT = 10;
@@ -280,25 +420,6 @@ const PROGMEM String PROGMEM_PAYLOADS[] =
     "DELAY 2500\n"
 };
 
-void setup() {
-    // init led pin
-    pinMode( LED_PIN, OUTPUT );
-
-    // init tft screen
-    tft.initR( INITR_BLACKTAB );
-    tft.setRotation( SCREEN_ROTATION );
-    tft.fillScreen( bgcolor ); // clear screen
-
-    // Initialize control over keyboard
-    Keyboard.begin();
-
-    // Small delay for screen and keyboard
-    delay( 500 );
-
-    while( true )
-        payloadMenuPROGMEM(); // forever loop progmem payload menu
-}
-
 // menu for PROGMEM payloads because i cant find my free microsd card from micro center ;-;
 void payloadMenuPROGMEM()
 {
@@ -311,6 +432,7 @@ void payloadMenuPROGMEM()
 
     int selected = 0;
     bool exit = false;
+    bool enter = true;
     do
     {
         // update menu
@@ -322,13 +444,22 @@ void payloadMenuPROGMEM()
             tft.setCursor( 8, ( i + 2 ) * 8 );
             tft.print( PROGMEM_PAYLOAD_NAMES[ i ] );
         }
+        tft.setCursor( 8, ( PROGMEM_PAYLOAD_COUNT + 2 ) * 8 );
+        tft.print( "back" );
         tft.setCursor( 0, ( selected + 2 ) * 8 );
         tft.print( ">" ); // print cursor
+
+        // wait till no input if entering into menu
+        if( enter )
+        {
+            while( btns.pressed( 0 ) || btns.pressed( 1 ) || btns.pressed( 2 ) ); // wait till no more input
+            enter = false;
+        }
 
         bool up = false;
         bool down = false;
         // wait for input
-        while( !exit && !up && !down )
+        while( !enter && !exit && !up && !down )
         {
             if( btns.pressed( 1 ) ) // execute current selection if center button pressed
                 exit = true;
@@ -344,13 +475,19 @@ void payloadMenuPROGMEM()
             selected ++;
         // keep in bounds
         if( selected < 0 )
+            selected = PROGMEM_PAYLOAD_COUNT;
+        else if( selected > PROGMEM_PAYLOAD_COUNT )
             selected = 0;
-        else if( selected >= PROGMEM_PAYLOAD_COUNT )
-            selected = PROGMEM_PAYLOAD_COUNT - 1;
     } 
     while( !exit ); // while not exit from menu
+    if( selected != PROGMEM_PAYLOAD_COUNT ) // if not "back" option
+        executePayload( PROGMEM_PAYLOADS[ selected ] );
+}
 
-    executePayload( PROGMEM_PAYLOADS[ selected ] );
+// Micro SD card payload browser menu
+void payloadMenuMicroSD()
+{
+
 }
 
 // takes an newline sperated string of duckyscript commands
@@ -626,6 +763,32 @@ void processCommand( String command )
         Keyboard.press( KEY_F11 );
     else if( command == "F12" || command == "FUNCTION12" )
         Keyboard.press( KEY_F12 );
+}
+
+void setup() {
+    // init led pin
+    pinMode( LED_PIN, OUTPUT );
+
+    // Small delay for screen and keyboard
+    delay( 250 );
+
+    // init tft screen
+    tft.initR( INITR_BLACKTAB );
+    tft.setRotation( SCREEN_ROTATION );
+    tft.fillScreen( bgcolor ); // clear screen
+
+    // init SD card
+    pinMode( SD_CS, OUTPUT );
+    sdCardFail = !SD.begin( SD_CS );
+
+    // Initialize control over keyboard
+    Keyboard.begin();
+
+    // another small delay for screen and keyboard
+    delay( 500 );
+
+    while( true )
+        mainMenu(); // forever loop progmem payload menu
 }
 
 void loop() 
