@@ -18,6 +18,7 @@
 // MISO - GP16
 // SCK - GP18
 // MOSI - GP19
+#define LITE_PIN 6 // pwm tft brightness pin
 #define TFT_CS 10
 #define TFT_RST 9
 #define TFT_DC 8
@@ -91,20 +92,25 @@ class ButtonHandler
 ButtonHandler btns = ButtonHandler( BTN0_PIN, BTN1_PIN, BTN2_PIN );
 Adafruit_ST7735 tft = Adafruit_ST7735( TFT_CS, TFT_DC, TFT_RST );
 
+// screen brightness
+uint8_t brightness = 127;
+
 // colors for drawing
 uint16_t bgcolor = ST77XX_BLACK;
-uint16_t textcolor = ST77XX_GREEN;
+uint16_t textcolor = ST7735_MAGENTA;
 uint16_t textcolor2 = ST77XX_RED;
 
 // sd card status
 bool sdCardFail = false;
 
-const PROGMEM int MAIN_MENU_COUNT = 3;
+const PROGMEM int MAIN_MENU_COUNT = 5;
 const PROGMEM int MICRO_SD_INDEX = 1;
 const PROGMEM String MAIN_MENU_OPTIONS[] =
 {
     "PROGMEM",
     "Micro SD",
+    "Colors",
+    "Brightness",
     "Help!!!"
 };
 
@@ -125,7 +131,7 @@ void mainMenu()
         // update menu
         tft.fillScreen( bgcolor ); // clear screen
         tft.setCursor( 0, 0 );
-        tft.print( "The Baddest USB v0.5" ); // display menu label
+        tft.print( "The Baddest USB v0.7" ); // display menu label
         for( int i = 0; i < MAIN_MENU_COUNT; i ++ ) // display menu options
         {
             if( sdCardFail && i == MICRO_SD_INDEX )
@@ -180,6 +186,12 @@ void mainMenu()
             payloadMenuMicroSD();
         break;
         case 2:
+            colorsMenu();
+        break;
+        case 3:
+            brightnessMenu();
+        break;
+        case 4:
             helpScreen();
         break;
         default:
@@ -224,12 +236,190 @@ void helpScreen()
     // wait for input to exit
     bool exit = false;
     bool enter = true;
+    int selected = 0;
     while( !exit )
     {
         if( enter && !btns.pressed( 0 ) && !btns.pressed( 1 ) && !btns.pressed( 2 ) ) // wait till no input if entering into menu
             enter = false;
         if( !enter && ( btns.pressed( 0 ) || btns.pressed( 1 ) || btns.pressed( 2 ) ) ) // execute current selection if center button pressed
             exit = true;
+    }
+}
+
+const PROGMEM int COLOR_MENU_COUNT = 7;
+const PROGMEM String COLORS_MENU_TEXT = 
+"Text:\n"
+"   R:\n"
+"   G:\n"
+"   B:\n"
+"\n"
+"Background:\n"
+"   R:\n"
+"   G:\n"
+"   B:\n"
+"\n"
+"   Exit";
+void colorsMenu()
+{
+    int selected = 0;
+    bool exit = false;
+    bool enter = true;
+    do
+    {
+        // display menu
+        tft.setTextColor( textcolor );
+        tft.setTextWrap( true );
+        tft.fillScreen( bgcolor ); // clear screen
+        tft.setCursor( 0, 0 );
+        tft.print( "Colors! :3" ); // display menu label
+        tft.setCursor( 0, 16 );
+        tft.print( COLORS_MENU_TEXT );
+        tft.fillRect( 30, 24, ( ( textcolor & ST77XX_RED ) >> 11 ) * 2, 8, ST77XX_RED );
+        tft.fillRect( 30, 32, ( textcolor & ST77XX_GREEN ) >> 5, 8, ST77XX_GREEN );
+        tft.fillRect( 30, 40, ( textcolor & ST77XX_BLUE ) * 2, 8, ST77XX_BLUE );
+        tft.fillRect( 30, 64, ( ( bgcolor & ST77XX_RED ) >> 11 ) * 2, 8, ST77XX_RED );
+        tft.fillRect( 30, 72, ( bgcolor & ST77XX_GREEN ) >> 5, 8, ST77XX_GREEN );
+        tft.fillRect( 30, 80, ( bgcolor & ST77XX_BLUE ) * 2, 8, ST77XX_BLUE );
+        uint8_t offset = 0; // offset for different option groups
+        if( selected >= 6 ) offset = 3;
+        else if( selected >= 3 ) offset = 2;
+        tft.setCursor( 12, ( offset + selected + 3 ) * 8 );
+        tft.print( ">" ); // print cursor
+
+        // wait till no input if entering into menu
+        if( enter )
+        {
+            while( btns.pressed( 0 ) || btns.pressed( 1 ) || btns.pressed( 2 ) ); // wait till no more input
+            enter = false;
+        }
+
+        bool select = false;
+        bool up = false;
+        bool down = false;
+        // wait for input
+        while( !enter && !exit && !select && !up && !down )
+        {
+            if( btns.pressed( 1 ) ) // execute current selection if center button pressed
+            {
+                select = true;
+                uint8_t textr = ( textcolor & ST77XX_RED ) >> 11;
+                uint8_t textg = ( textcolor & ST77XX_GREEN ) >> 5;
+                uint8_t textb = textcolor & ST77XX_BLUE;
+                uint8_t bgr = ( bgcolor & ST77XX_RED ) >> 11;
+                uint8_t bgg = ( bgcolor & ST77XX_GREEN ) >> 5;
+                uint8_t bgb = bgcolor & ST77XX_BLUE;
+                switch( selected )
+                {
+                    case 0:
+                        textr ++;
+                    break;
+                    case 1:
+                        textg ++;
+                    break;
+                    case 2:
+                        textb ++;
+                    break;
+                    case 3:
+                        bgr ++;
+                    break;
+                    case 4:
+                        bgg ++;
+                    break;
+                    case 5:
+                        bgb ++;
+                    break;
+                    case 6:
+                        exit = true;
+                    break;
+                }
+                if( textr > 31 ) textr = 0; 
+                if( textg > 63 ) textg = 0; 
+                if( textb > 31 ) textb = 0; 
+                if( bgr > 31 ) bgr = 0; 
+                if( bgg > 63 ) bgg = 0; 
+                if( bgb > 31 ) bgb = 0; 
+                textcolor = textr << 11 | textg << 5 | textb; 
+                bgcolor = bgr << 11 | bgg << 5 | bgb; 
+            }
+            while( btns.pressed( 0 ) ) // keep going in loop until press has stopped
+                up = true;
+            while( btns.pressed( 2 ) ) // keep going in loop until press has stopped
+                down = true;
+        }
+        // move selected number
+        if( up )
+            selected --;
+        else if( down )
+            selected ++;
+        // keep in bounds
+        if( selected < 0 )
+            selected = COLOR_MENU_COUNT - 1;
+        else if( selected >= COLOR_MENU_COUNT )
+            selected = 0;
+    } 
+    while( !exit ); // while not exit from menu
+}
+
+// change brightness and print change to screen
+void brightnessMenuChange( int amount )
+{
+    brightness += amount;
+    uint8_t digits = 1;
+    uint8_t temp = brightness;
+    uint8_t centered = 0;
+    while ( temp /= 10 )
+        digits ++;
+    switch( digits )
+    {
+        case 1:
+            centered = 54;
+        break;
+        case 2:
+            centered = 45;
+        break;
+        case 3:
+            centered = 36;
+        break;
+        default:
+        break;
+    }
+    tft.setCursor( centered, 100 );
+    tft.setTextSize( 3 );
+    tft.fillRect( 0, 100, 127, 24, bgcolor );
+    tft.print( brightness );
+    tft.setTextSize( 1 );
+    analogWrite( LITE_PIN, brightness ); // set brightness
+}
+
+// screen brightness menu
+void brightnessMenu()
+{
+    // prepare tft for printing screen brightness text
+    tft.setTextColor( textcolor );
+    tft.setTextWrap( true );
+
+    // display menu
+    tft.fillScreen( bgcolor ); // clear screen
+    tft.setCursor( 0, 0 );
+    tft.print( "Screen Brightness" ); // display menu label
+    tft.setCursor( 0, 16 );
+    tft.print( "Change Brightness:\nUp/Down Buttons\n\nExit:\nMiddle Button\n\n\n\n     Brightness:" );
+    brightnessMenuChange( 0 ); // print current brightness
+
+    // wait for input to exit
+    bool exit = false;
+    bool enter = true;
+    while( !exit )
+    {
+        if( enter && !btns.pressed( 0 ) && !btns.pressed( 1 ) && !btns.pressed( 2 ) ) // wait till no input if entering into menu
+            enter = false;
+        if( !enter && ( btns.pressed( 0 ) ) ) // turn up brightness
+            brightnessMenuChange( 1 );
+        if( !enter && ( btns.pressed( 1 ) ) ) // exit
+            exit = true;
+        if( !enter && ( btns.pressed( 2 ) ) ) // turn down brightness
+             brightnessMenuChange( -1 );
+        delay( 50 ); // small delay to keep brightness speed slower
     }
 }
 
@@ -766,8 +956,10 @@ void processCommand( String command )
 }
 
 void setup() {
-    // init led pin
+    // init output pins
     pinMode( LED_PIN, OUTPUT );
+    pinMode( LITE_PIN, OUTPUT );
+    analogWrite( LITE_PIN, brightness );
 
     // Small delay for screen and keyboard
     delay( 250 );
